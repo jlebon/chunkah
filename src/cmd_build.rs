@@ -8,7 +8,7 @@ use clap::Parser;
 use ocidir::oci_spec::image as oci_image;
 use serde::Deserialize;
 
-use crate::components::{Component, FileMap};
+use crate::components::{Component, ComponentsRepos, FileMap};
 use crate::ocibuilder::{Builder, Compression};
 use crate::packing::{PackItem, calculate_packing};
 use crate::utils;
@@ -170,9 +170,16 @@ pub fn run(args: &BuildArgs) -> Result<()> {
     let rootfs = Dir::open_ambient_dir(args.rootfs.as_std_path(), ambient_authority())
         .with_context(|| format!("opening rootfs {}", args.rootfs))?;
 
-    let components =
-        crate::scan::scan_for_components(&rootfs, created_epoch, args.skip_special_files)
-            .with_context(|| format!("scanning {} for components", args.rootfs))?;
+    let files = crate::scan::scan_rootfs(&rootfs, args.skip_special_files)
+        .with_context(|| format!("scanning {} for files", args.rootfs))?;
+
+    let repos =
+        ComponentsRepos::load(&rootfs, &files, created_epoch).context("loading components")?;
+    if repos.is_empty() {
+        anyhow::bail!("no supported component repo found in rootfs");
+    }
+
+    let components = repos.into_components(files);
 
     // pack components down to max layers
     let components = pack_components(args, components).context("packing components")?;

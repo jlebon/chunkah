@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::ops::ControlFlow;
 use std::path::Path;
 
@@ -7,28 +7,7 @@ use camino::Utf8Path;
 use cap_std::fs::Dir;
 use cap_std_ext::dirext::{CapStdExtDirExt, WalkConfiguration};
 
-use crate::components::{self, Component, FileInfo, FileMap, FileType};
-
-/// Scan the rootfs for components and return a mapping of component names to components.
-///
-/// If `skip_special_files` is true, special file types (sockets, FIFOs,
-/// block/char devices) are silently skipped. Otherwise, an error is returned.
-pub fn scan_for_components(
-    rootfs: &Dir,
-    default_mtime_clamp: u64,
-    skip_special_files: bool,
-) -> Result<HashMap<String, Component>> {
-    let files = scan_rootfs(rootfs, skip_special_files).context("scanning rootfs")?;
-
-    let repos = components::ComponentsRepos::load(rootfs, &files, default_mtime_clamp)
-        .context("loading components")?;
-    if repos.is_empty() {
-        // error for now but i guess we could just warn and have a single layer
-        anyhow::bail!("no supported component repo found in rootfs");
-    }
-
-    Ok(repos.into_components(files))
-}
+use crate::components::{FileInfo, FileMap, FileType};
 
 /// Scan the rootfs and return a map of file paths to their metadata.
 /// We use cap-std-ext's walk here, which doesn't follow symlinks.
