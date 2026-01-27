@@ -35,14 +35,14 @@ assert_has_components() {
     done
 }
 
-# Assert that an image has at least the expected number of layers.
-assert_min_layers() {
+# Assert that an image has exactly the expected number of layers.
+assert_layer_count() {
     local image="${1}"; shift
-    local min_count="${1}"; shift
+    local expected="${1}"; shift
     local count
     count=$(skopeo inspect "containers-storage:${image}" | jq '.LayersData | length')
-    if [[ ${count} -lt ${min_count} ]]; then
-        echo "ERROR: Expected at least ${min_count} layers, got ${count} in ${image}"
+    if [[ ${count} -ne ${expected} ]]; then
+        echo "ERROR: Expected ${expected} layers, got ${count} in ${image}"
         exit 1
     fi
 }

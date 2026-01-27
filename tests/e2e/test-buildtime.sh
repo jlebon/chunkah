@@ -39,8 +39,8 @@ podman run --rm "${CHUNKED_IMAGE}" jq --version
 # check for expected components
 assert_has_components "${CHUNKED_IMAGE}" "rpm/filesystem" "rpm/setup" "rpm/glibc" "rpm/jq"
 
-# sanity-check we got at least 16 layers
-assert_min_layers "${CHUNKED_IMAGE}" 16
+# verify we got exactly 64 layers (the default)
+assert_layer_count "${CHUNKED_IMAGE}" 64
 
 # verify that security.capability xattrs are preserved
 caps=$(podman run --rm "${CHUNKED_IMAGE}" getcap /usr/bin/test-caps)
