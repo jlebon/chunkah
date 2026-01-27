@@ -46,3 +46,6 @@ assert_path_not_exists "${CHUNKED_IMAGE}" /prune-me
 # verify --prune /prune-children/ kept the directory but removed its contents
 assert_path_exists "${CHUNKED_IMAGE}" /prune-children
 assert_path_not_exists "${CHUNKED_IMAGE}" /prune-children/nested
+
+# verify we got exactly 64 layers (the default)
+assert_layer_count "${CHUNKED_IMAGE}" 64
