@@ -28,6 +28,9 @@ def main():
         if tag_exists(tag):
             die(f"Tag {tag} already exists")
 
+        if is_worktree_dirty():
+            die("Worktree is dirty, commit or stash changes first")
+
         step("Verifying Cargo.lock is in sync...")
         run("just", "lockcheck")
 
@@ -136,6 +139,11 @@ def verify_version(expected: str):
 def tag_exists(tag: str) -> bool:
     """Check if a git tag exists."""
     return run_output("git", "tag", "-l", tag).strip() != ""
+
+
+def is_worktree_dirty() -> bool:
+    """Check if the git worktree has uncommitted changes."""
+    return run_output("git", "status", "--porcelain").strip() != ""
 
 
 def fetch_release_notes(tag: str) -> str:
