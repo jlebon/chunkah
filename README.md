@@ -79,6 +79,11 @@ argument.
 >
 > For Buildah versions before v1.43, this also requires `-v $(pwd):/run/src
 > --security-opt=label=disable`.
+> [!NOTE]
+> There is [a known bug][buildah-annotations-bug] in this workflow preventing
+> informational layer annotations added by chunkah from persisting to the final
+> image. If you're interested in that information, you must use the `podman
+> load` flow below.
 
 Another option is using the chunkah image directly and image mounts:
 
@@ -230,3 +235,4 @@ well.
 [build-chunked-oci]: https://coreos.github.io/rpm-ostree/build-chunked-oci/
 [OCI image config]: https://github.com/opencontainers/image-spec/blob/26647a49f642c7d22a1cd3aa0a48e4650a542269/specs-go/v1/config.go#L24
 [buildah-rfe]: https://github.com/containers/buildah/issues/6621
+[buildah-annotations-bug]: https://github.com/containers/buildah/issues/6652
