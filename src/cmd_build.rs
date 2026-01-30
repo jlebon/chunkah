@@ -45,10 +45,11 @@ pub struct BuildArgs {
     )]
     config_str: Option<String>,
 
-    /// Add a label to the image
+    /// Add or remove a label from the image
     ///
-    /// Format: KEY=VALUE. Can be specified multiple times.
-    #[arg(long = "label", value_name = "KEY=VALUE")]
+    /// Format: KEY=VALUE to set, KEY- to remove, or - to clear all.
+    /// Operations are processed in order; - clears both base config and prior CLI labels.
+    #[arg(long = "label", value_name = "KEY=VALUE|KEY-|-")]
     labels: Vec<String>,
 
     /// Add an annotation to the image manifest
@@ -300,16 +301,28 @@ fn build_image_config(
 }
 
 /// Parse KEY=VALUE pairs and merge into an existing map.
+///
+/// Supports three formats:
+/// - `key=value`: set or override a key
+/// - `key-`: remove a key (trailing dash)
+/// - `-`: clear all keys
 fn parse_key_value_pairs(
     pairs: &[String],
     mut map: HashMap<String, String>,
 ) -> Result<HashMap<String, String>> {
     for pair in pairs {
-        let (k, v) = pair
-            .split_once('=')
-            .with_context(|| format!("must be in KEY=VALUE format: {pair}"))?;
-        anyhow::ensure!(!k.is_empty(), "key cannot be empty: {pair}");
-        map.insert(k.to_string(), v.to_string());
+        if let Some((k, v)) = pair.split_once('=') {
+            anyhow::ensure!(!k.is_empty(), "key cannot be empty: {pair}");
+            map.insert(k.to_string(), v.to_string());
+        } else if let Some(k) = pair.strip_suffix('-') {
+            if k.is_empty() {
+                map.clear();
+            } else {
+                map.remove(k);
+            }
+        } else {
+            anyhow::bail!("label must be in KEY=VALUE or KEY- format: {pair}");
+        }
     }
     Ok(map)
 }
@@ -524,7 +537,7 @@ mod tests {
 
     #[test]
     fn test_parse_key_value_pairs_invalid() {
-        let invalid_pairs = ["", "no-equals", "=", "=value"];
+        let invalid_pairs = ["", "no-equals", "=", "=value", "-key", "=-"];
 
         for pair in invalid_pairs {
             let pairs = vec![pair.into()];
@@ -537,24 +550,52 @@ mod tests {
     fn test_parse_key_value_pairs_valid() {
         use maplit::hashmap;
 
-        let test_cases: &[(&str, HashMap<String, String>)] = &[
-            ("key=value", hashmap! { "key".into() => "value".into() }),
-            ("key=", hashmap! { "key".into() => "".into() }),
-            (
-                "key=value=with=equals",
-                hashmap! { "key".into() => "value=with=equals".into() },
-            ),
-        ];
+        let base = hashmap! {
+            "to-remove".into() => "base".into(),
+            "to-override".into() => "base".into(),
+            "-".into() => "dash-value".into(),
+        };
+        let result = parse_key_value_pairs(
+            &[
+                "to-remove-".into(),
+                "to-override=cli".into(),
+                "new=first".into(),
+                "new=second".into(),
+                "empty=".into(),
+                "has=equals=in=value".into(),
+                "nonexistent-".into(),
+                "--".into(),
+            ],
+            base,
+        )
+        .unwrap();
+        assert_eq!(
+            result,
+            hashmap! {
+                "to-override".into() => "cli".into(),
+                "new".into() => "second".into(),
+                "empty".into() => "".into(),
+                "has".into() => "equals=in=value".into(),
+            }
+        );
+    }
 
-        for (pair, expected) in test_cases {
-            let pairs = vec![(*pair).into()];
-            let result = parse_key_value_pairs(&pairs, HashMap::new()).unwrap();
-            assert_eq!(
-                &result, expected,
-                "pair {:?} should produce {:?}",
-                pair, expected
-            );
-        }
+    #[test]
+    fn test_parse_key_value_pairs_clear() {
+        use maplit::hashmap;
+
+        // Verify "-" clears both base labels and earlier CLI pairs
+        let base = hashmap! { "from-base".into() => "value".into() };
+        let result = parse_key_value_pairs(
+            &[
+                "from-cli=value".into(),  // add via CLI
+                "-".into(),               // clear all (base + CLI)
+                "after-clear=new".into(), // add after clear
+            ],
+            base,
+        )
+        .unwrap();
+        assert_eq!(result, hashmap! { "after-clear".into() => "new".into() });
     }
 
     #[test]
