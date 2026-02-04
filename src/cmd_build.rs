@@ -10,7 +10,7 @@ use serde::Deserialize;
 
 use crate::components::{Component, ComponentsRepos, FileMap};
 use crate::ocibuilder::{Builder, Compression};
-use crate::packing::{PackItem, calculate_packing};
+use crate::packing::{calculate_packing, PackItem};
 use crate::utils;
 
 #[derive(Parser, Default)]
@@ -103,6 +103,15 @@ pub struct BuildArgs {
     /// absolute.
     #[arg(long = "prune", value_name = "PATH")]
     prune: Vec<Utf8PathBuf>,
+
+    /// Prune common temporary directories
+    ///
+    /// Equivalent to: `--prune /run --prune /tmp --prune /var/tmp`
+    ///
+    /// There's no good reason to include content in these directories
+    /// in container images in general.
+    #[arg(long)]
+    prune_tmp: bool,
 }
 
 impl BuildArgs {
@@ -179,9 +188,18 @@ pub fn run(args: &BuildArgs) -> Result<()> {
     let rootfs = Dir::open_ambient_dir(args.rootfs.as_std_path(), ambient_authority())
         .with_context(|| format!("opening rootfs {}", args.rootfs))?;
 
+    let mut prune_paths = args.prune.clone();
+
+    // Add common temporary directories if --prune-tmp is specified
+    if args.prune_tmp {
+        prune_paths.push(Utf8PathBuf::from("/run"));
+        prune_paths.push(Utf8PathBuf::from("/tmp"));
+        prune_paths.push(Utf8PathBuf::from("/var/tmp"));
+    }
+
     let files = crate::scan::Scanner::new(&rootfs)
         .skip_special_files(args.skip_special_files)
-        .prune(&args.prune)?
+        .prune(&prune_paths)?
         .scan()
         .with_context(|| format!("scanning {} for files", args.rootfs))?;
 
@@ -631,5 +649,51 @@ mod tests {
         assert_eq!(labels.get("existing"), Some(&"from-config".to_string()));
         assert_eq!(labels.get("override-me"), Some(&"new-value".to_string()));
         assert_eq!(labels.get("new-label"), Some(&"second".to_string()));
+    }
+
+    #[test]
+    fn test_prune_tmp_flag() {
+        // Test that --prune-tmp flag adds common temporary directories
+        let args = BuildArgs {
+            prune: vec![Utf8PathBuf::from("/custom")],
+            prune_tmp: true,
+            ..Default::default()
+        };
+
+        let mut prune_paths = args.prune.clone();
+        if args.prune_tmp {
+            prune_paths.push(Utf8PathBuf::from("/run"));
+            prune_paths.push(Utf8PathBuf::from("/tmp"));
+            prune_paths.push(Utf8PathBuf::from("/var/tmp"));
+        }
+
+        assert_eq!(prune_paths.len(), 4);
+        assert!(prune_paths.contains(&Utf8PathBuf::from("/custom")));
+        assert!(prune_paths.contains(&Utf8PathBuf::from("/run")));
+        assert!(prune_paths.contains(&Utf8PathBuf::from("/tmp")));
+        assert!(prune_paths.contains(&Utf8PathBuf::from("/var/tmp")));
+    }
+
+    #[test]
+    fn test_no_prune_tmp_flag() {
+        // Test that without --prune-tmp flag, only explicit prune paths are used
+        let args = BuildArgs {
+            prune: vec![Utf8PathBuf::from("/custom")],
+            prune_tmp: false,
+            ..Default::default()
+        };
+
+        let mut prune_paths = args.prune.clone();
+        if args.prune_tmp {
+            prune_paths.push(Utf8PathBuf::from("/run"));
+            prune_paths.push(Utf8PathBuf::from("/tmp"));
+            prune_paths.push(Utf8PathBuf::from("/var/tmp"));
+        }
+
+        assert_eq!(prune_paths.len(), 1);
+        assert!(prune_paths.contains(&Utf8PathBuf::from("/custom")));
+        assert!(!prune_paths.contains(&Utf8PathBuf::from("/run")));
+        assert!(!prune_paths.contains(&Utf8PathBuf::from("/tmp")));
+        assert!(!prune_paths.contains(&Utf8PathBuf::from("/var/tmp")));
     }
 }
