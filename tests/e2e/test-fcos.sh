@@ -48,5 +48,8 @@ size_chunked=$(podman image inspect "${CHUNKED_IMAGE}" | jq '.[0].Size')
 max_size=$((size_original * 101 / 100))
 [[ ${size_chunked} -le ${max_size} ]]
 
+# verify the chunked image is equivalent to the source (excluding pruned /sysroot/)
+assert_no_diff "${TARGET_IMAGE}" "${CHUNKED_IMAGE}" --skip /sysroot/
+
 # run bootc lint
 podman run --rm "${CHUNKED_IMAGE}" bootc container lint

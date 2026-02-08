@@ -30,7 +30,7 @@ assert_has_components() {
     for component in "$@"; do
         if ! grep -q "${component}" <<< "${annotations}"; then
             echo "ERROR: Expected component '${component}' not found in ${image}"
-            exit 1
+            return 1
         fi
     done
 }
@@ -43,7 +43,7 @@ assert_layer_count() {
     count=$(skopeo inspect "containers-storage:${image}" | jq '.LayersData | length')
     if [[ ${count} -ne ${expected} ]]; then
         echo "ERROR: Expected ${expected} layers, got ${count} in ${image}"
-        exit 1
+        return 1
     fi
 }
 
@@ -53,7 +53,7 @@ assert_path_exists() {
     local path="${1}"; shift
     if ! podman run --rm "${image}" test -e "${path}"; then
         echo "ERROR: ${path} should exist in ${image}"
-        exit 1
+        return 1
     fi
 }
 
@@ -63,8 +63,16 @@ assert_path_not_exists() {
     local path="${1}"; shift
     if podman run --rm "${image}" test -e "${path}"; then
         echo "ERROR: ${path} should not exist in ${image}"
-        exit 1
+        return 1
     fi
+}
+
+# Assert that two images have no filesystem differences (ignoring timestamps).
+# Additional arguments are passed through to chunkah-differ (e.g. --skip /sysroot/).
+assert_no_diff() {
+    local repo_root
+    repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+    just -f "${repo_root}/Justfile" diff "$@"
 }
 
 # Remove images, ignoring errors.

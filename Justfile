@@ -66,6 +66,23 @@ profile *ARGS:
 benchmark *ARGS:
     just -f tools/perf/Justfile benchmark {{ ARGS }}
 
+# Compare two container images for equivalence
+diff +ARGS:
+    #!/bin/bash
+    set -euo pipefail
+    img="localhost/chunkah-differ:latest"
+    if ! podman image exists "${img}"; then
+        podman build -t "${img}" tools/differ
+    fi
+    # Split args: first two are image names, rest are passed through
+    args=({{ ARGS }})
+    image1="${args[0]}"
+    image2="${args[1]}"
+    podman run --rm \
+        --mount=type=image,src="${image1}",target=/image1 \
+        --mount=type=image,src="${image2}",target=/image2 \
+        "${img}" /image1 /image2 "${args[@]:2}"
+
 # Cut a release (use --no-push to prepare without pushing)
 release *ARGS:
     ./tools/release.py {{ ARGS }}

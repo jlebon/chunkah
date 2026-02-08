@@ -32,3 +32,6 @@ assert_has_components "${CHUNKED_IMAGE}" "rpm/filesystem" "rpm/setup" "rpm/glibc
 
 # verify we got exactly 64 layers (the default)
 assert_layer_count "${CHUNKED_IMAGE}" 64
+
+# verify the chunked image is equivalent to the source
+assert_no_diff "${TARGET_IMAGE}" "${CHUNKED_IMAGE}"
