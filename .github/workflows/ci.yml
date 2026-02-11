@@ -34,10 +34,23 @@ jobs:
     strategy:
       matrix:
         include:
-          - arch: amd64
+          - name: e2e-tests (fedora, amd64)
             runner: ubuntu-24.04
-          - arch: arm64
+            arch: amd64
+            push: true
+          - name: e2e-tests (fedora, arm64)
             runner: ubuntu-24.04-arm
+            arch: arm64
+            push: true
+          - name: e2e-tests (ubi9)
+            runner: ubuntu-24.04
+            base: registry.access.redhat.com/ubi9/ubi:latest
+            tests: self
+          - name: e2e-tests (ubi10)
+            runner: ubuntu-24.04
+            base: registry.access.redhat.com/ubi10/ubi:latest
+            tests: self
+    name: ${{ matrix.name }}
     permissions:
       contents: read
       packages: write
@@ -50,11 +63,11 @@ jobs:
       - name: Install tools
         run: dnf install -y just buildah podman skopeo jq
       - name: Build image
-        run: just buildimg
+        run: just buildimg -- ${{ matrix.base && format('--build-arg=BASE={0}', matrix.base) || '' }}
       - name: Run tests
-        run: just test
+        run: just test ${{ matrix.tests }}
       - name: Push to ghcr.io
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && matrix.push
         run: |
           set -euo pipefail
           podman login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
