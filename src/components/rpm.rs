@@ -60,19 +60,20 @@ impl RpmRepo {
                 .map(parse_srpm_name)
                 .unwrap_or(&pkg.name);
 
-            let stability = calculate_stability(&pkg.changelog_times, pkg.buildtime, now)?;
             let entry = components.entry(component_name.to_string());
             let component_id = ComponentId(entry.index());
-            entry
-                .and_modify(|(existing_bt, existing_stab)| {
+            match entry {
+                indexmap::map::Entry::Occupied(mut e) => {
                     // Build time across subpackages for a given SRPM can vary.
                     // We want the max() of all of them as the clamp.
-                    if pkg.buildtime > *existing_bt {
-                        *existing_bt = pkg.buildtime;
-                        *existing_stab = stability;
-                    }
-                })
-                .or_insert((pkg.buildtime, stability));
+                    let (existing_bt, _) = e.get_mut();
+                    *existing_bt = (*existing_bt).max(pkg.buildtime);
+                }
+                indexmap::map::Entry::Vacant(e) => {
+                    let stability = calculate_stability(&pkg.changelog_times, pkg.buildtime, now)?;
+                    e.insert((pkg.buildtime, stability));
+                }
+            }
 
             for (path, file_info) in pkg.files.into_iter() {
                 // Accumulate entries for all file types. Skip if this component
