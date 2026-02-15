@@ -83,6 +83,25 @@ diff +ARGS:
         --mount=type=image,src="${image2}",target=/image2 \
         "${img}" /image1 /image2 "${args[@]:2}"
 
+# Split an existing image using the splitter Containerfile
+split IMG *ARGS:
+    #!/bin/bash
+    set -euo pipefail
+    shopt -s inherit_errexit
+    buildah="${BUILDAH:-buildah}"
+    args=(--skip-unused-stages=false --from "{{ IMG }}")
+    args+=(--build-arg CHUNKAH=localhost/chunkah)
+    args+=(--build-arg "CHUNKAH_CONFIG_STR=$(podman inspect {{ IMG }})")
+    if [[ -n "{{ ARGS }}" ]]; then
+        args+=(--build-arg "CHUNKAH_ARGS={{ ARGS }}")
+    fi
+    # drop this once we can assume 1.44
+    version=$(${buildah} version --json | jq -r '.version')
+    if [[ $(echo -e "${version}\n1.44" | sort -V | head -n1) != "1.44" ]]; then
+        args+=(-v "$PWD:/run/src" --security-opt=label=disable)
+    fi
+    ${buildah} build "${args[@]}" Containerfile.splitter
+
 # Cut a release (use --no-push to prepare without pushing)
 release *ARGS:
     ./tools/release.py {{ ARGS }}
