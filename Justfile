@@ -78,7 +78,7 @@ diff +ARGS:
     args=({{ ARGS }})
     image1="${args[0]}"
     image2="${args[1]}"
-    podman run --rm \
+    podman run --rm -v /var/tmp \
         --mount=type=image,src="${image1}",target=/image1 \
         --mount=type=image,src="${image2}",target=/image2 \
         "${img}" /image1 /image2 "${args[@]:2}"
