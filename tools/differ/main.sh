@@ -10,7 +10,7 @@
 # Usage: chunkah-differ.sh <dir1> <dir2> [--skip <path>]...
 #
 # Example:
-#   podman run --rm \
+#   podman run --rm -v /var/tmp \
 #     --mount=type=image,src=original:latest,target=/image1 \
 #     --mount=type=image,src=chunked:latest,target=/image2 \
 #     localhost/chunkah-differ /image1 /image2 --skip /sysroot
@@ -22,9 +22,9 @@ DIR1=""
 DIR2=""
 SKIP_PATHS=()
 
-REPO="/tmp/chunkah-differ-repo"
-CO1="/tmp/chunkah-differ-co1"
-CO2="/tmp/chunkah-differ-co2"
+REPO="/var/tmp/chunkah-differ-repo"
+CO1="/var/tmp/chunkah-differ-co1"
+CO2="/var/tmp/chunkah-differ-co2"
 
 usage() {
     echo "Usage: $(basename "$0") <dir1> <dir2> [--skip <path>]..."
@@ -94,10 +94,24 @@ parse_args() {
     fi
 }
 
-# Commit both directory trees into a bare ostree repo.
+# Commit both directory trees into a bare ostree repo. The nice thing about
+# ostree is that it cares about exactly the things we care about; not mtime,
+# but yes most inode metadata, and xattrs. Whereas diffoscope for example can't
+# ignore _just mtime_. The --prune chunkah switch also maps well to ostree
+# commit's skiplists.
 commit_trees() {
-    # Create a bare ostree repo (bare mode preserves all xattrs including
-    # security.capability on both commit and checkout)
+    repo_dirname=$(dirname "${REPO}")
+    fstype=$(stat --file-system "${repo_dirname}" --format '%T')
+    if [[ "${fstype}" = overlayfs ]]; then
+        echo "Must mount volume at ${repo_dirname}!" >&2
+        return 1
+    fi
+
+    # XXX: This could be a bare-user repo. That would drop the requirement on
+    # !overlayfs above. We make it a bare repo so that when we check it out, we
+    # have files closer to the real thing that we can inspect and run diffoscope
+    # and getfattr on. Anoher approach is to rewrite all this in Python/Rust and
+    # use ostree APIs to get file info and generate diffs... more work.
     ostree init --repo="${REPO}" --mode=bare
 
     local skiplist1="/tmp/chunkah-differ-skiplist1"
