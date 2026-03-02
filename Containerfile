@@ -21,7 +21,7 @@ FROM ${BASE} AS rootfs
 ARG DNF_FLAGS
 RUN --mount=type=cache,id=dnf,target=/mnt \
     cp -a /mnt /var/cache/libdnf5 && \
-    dnf install ${DNF_FLAGS} openssl zlib skopeo && rm -rf /var/cache/*
+    dnf install ${DNF_FLAGS} openssl zlib && rm -rf /var/cache/*
 COPY --from=builder /usr/bin/chunkah /usr/bin/chunkah
 
 FROM rootfs AS rechunk
