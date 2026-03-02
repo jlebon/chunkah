@@ -8,7 +8,7 @@ Summary:        OCI building tool for content-based container image layers
 # chunkah itself is MIT OR Apache-2.0
 # LICENSE.dependencies contains full breakdown of vendored crates
 License:        MIT OR Apache-2.0
-URL:            https://github.com/jlebon/chunkah
+URL:            https://github.com/coreos/chunkah
 Source0:        %{url}/releases/download/v%{version}/%{crate}-%{version}.tar.gz
 Source1:        %{url}/releases/download/v%{version}/%{crate}-%{version}-vendor.tar.gz
 

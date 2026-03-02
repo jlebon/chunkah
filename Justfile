@@ -28,7 +28,7 @@ versioncheck:
     set -euo pipefail
     cargo update chunkah --locked
     cargo_version=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[0].version')
-    line=$(grep -E '^\s+https://github\.com/jlebon/chunkah/releases/download/v[0-9]+\.[0-9]+\.[0-9]+/Containerfile\.splitter$' README.md) \
+    line=$(grep -E '^\s+https://github\.com/coreos/chunkah/releases/download/v[0-9]+\.[0-9]+\.[0-9]+/Containerfile\.splitter$' README.md) \
         || { echo "Could not find Containerfile.splitter download URL in README.md"; exit 1; }
     readme_version=$(echo "${line}" | grep -oP 'download/v\K[0-9]+\.[0-9]+\.[0-9]+')
     if [[ "${cargo_version}" != "${readme_version}" ]]; then
