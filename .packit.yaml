@@ -1,11 +1,41 @@
 upstream_tag_template: v{version}
 specfile_path: packaging/chunkah.spec
 
+srpm_build_deps:
+  - cargo
+  - cargo-vendor-filterer
+  - git
+  - openssl-devel
+  - zlib-devel
+
+actions:
+  create-archive:
+    - tools/create-archives.sh --outdir packaging
+  # Packit only handles Source0 by default; we need to also rewrite Source1
+  # (the vendor tarball). Overriding this replaces all default behaviour, so
+  # we must handle Version, Release, and Source0 ourselves too.
+  fix-spec-file:
+    - >-
+        bash -c 'sed -i
+        -e "s/^Version:.*/Version:        ${PACKIT_PROJECT_VERSION}/"
+        -e "s/^Release:.*/Release:        ${PACKIT_RPMSPEC_RELEASE}%{?dist}/"
+        -e "s|^Source0:.*|Source0:        ${PACKIT_PROJECT_ARCHIVE}|"
+        -e "s|^Source1:.*|Source1:        chunkah-${PACKIT_PROJECT_VERSION}-vendor.tar.gz|"
+        packaging/chunkah.spec'
+
 files_to_sync:
   - src: packaging/chunkah.spec
     dest: chunkah.spec
 
 jobs:
+  # Build RPMs in COPR on every PR
+  - job: copr_build
+    trigger: pull_request
+    targets:
+      - fedora-latest-stable
+      - fedora-rawhide
+
+  # Propose updates to Fedora on release
   - job: propose_downstream
     trigger: release
     dist_git_branches:

@@ -60,11 +60,8 @@ def main():
         step(f"Creating signed tag {tag}...")
         create_signed_tag(tag, edited_notes)
 
-        step("Generating source tarball...")
-        generate_source_tarball(tag, args.version, source_tarball)
-
-        step("Generating vendor tarball...")
-        generate_vendor_tarball(vendor_tarball)
+        step("Generating source and vendor tarballs...")
+        generate_archives(source_tarball, vendor_tarball)
 
         step("Verifying offline build...")
         verify_offline_build(args.version, source_tarball, vendor_tarball)
@@ -178,20 +175,9 @@ def create_signed_tag(tag: str, message: str):
             "-F", f.name)
 
 
-def generate_source_tarball(tag: str, version: str, output: str):
-    """Generate source tarball using git archive."""
-    prefix = f"{NAME}-{version}/"
-    run("git", "archive", "--format=tar.gz", f"--prefix={prefix}",
-        "-o", output, tag)
-
-
-def generate_vendor_tarball(output: str):
-    """Generate vendored dependencies tarball."""
-    run("cargo", "vendor-filterer",
-        "--platform", "*-unknown-linux-*",
-        "--format=tar.gz",
-        "--prefix=vendor",
-        output)
+def generate_archives(source_tarball: str, vendor_tarball: str):
+    """Generate source and vendor tarballs using create-archives.sh."""
+    run("tools/create-archives.sh", source_tarball, vendor_tarball)
 
 
 def verify_offline_build(version: str, source: str, vendor: str):
