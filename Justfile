@@ -41,7 +41,7 @@ checkall: shellcheck check fmt clippy markdownlint versioncheck
 
 # Build chunkah container image (use --no-chunk to skip chunking for faster builds)
 [arg("no_chunk", long="no-chunk", value="true")]
-buildimg no_chunk="":
+buildimg no_chunk="" *ARGS:
     #!/bin/bash
     set -euo pipefail
     buildah="${BUILDAH:-buildah}"
@@ -51,6 +51,7 @@ buildimg no_chunk="":
     if [[ $(echo -e "${version}\n1.44" | sort -V | head -n1) != "1.44" ]]; then
         args+=(-v "$PWD:/run/src" --security-opt=label=disable)
     fi
+    args+=({{ ARGS }})
     echo ${buildah} build "${args[@]}" .
     ${buildah} build "${args[@]}" .
     rm -f out.ociarchive
