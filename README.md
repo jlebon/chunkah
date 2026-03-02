@@ -142,10 +142,16 @@ build` flow and also makes it more natural to apply configs to the image, but is
 specific to the Podman ecosystem. This *will not* work with Docker.
 
 ```Dockerfile
+# Optional; by default base image metadata (like labels) are lost and need to
+# either be repeated in the final stage or passed in via a build arg like this
+# one. Use with `--build-arg CHUNKAH_CONFIG_STR=$(podman inspect $IMG)`.
+ARG CHUNKAH_CONFIG_STR
+
 FROM quay.io/fedora/fedora-minimal:latest AS builder
 RUN dnf install -y git-core && dnf clean all
 
 FROM quay.io/jlebon/chunkah AS chunkah
+ARG CHUNKAH_CONFIG_STR
 RUN --mount=from=builder,src=/,target=/chunkah,ro \
     --mount=type=bind,target=/run/src,rw \
         chunkah build > /run/src/out.ociarchive
@@ -237,11 +243,38 @@ set annotations directly using `--annotation`. Labels can also be added via
 chunkah has no special handling for [bootable container images]. This should
 work fine for non-OSTree based images (i.e. "plain" images). Packing still needs
 to be fine-tuned for bootable images (or very large images in general). You will
-likely want to increase the default maximum number of layers from 64 (e.g. 96)
+likely want to increase the default maximum number of layers from 64 (e.g. 128)
 for better splitting.
 
-OSTree-based images as created by `rpm-ostree` and `ostree container
-encapsulate` are not supported.
+As mentioned in [this
+section](#splitting-an-image-at-build-time-buildahpodman-only), in the build
+time flow, labels from the base image will be lost, including versioning
+information and `containers.bootc=1`, which is required by bootc. So you'll want
+to use a `CHUNKAH_CONFIG_STR` build arg or just re-add the label.
+
+Using chunkah to rechunk an OSTree-based bootc image is also possible by
+transforming it into a plain one by passing `--prune /sysroot/` to strip OSTree
+data from the image. If base metadata is persisted (either the existing image
+flow, or the build time flow with inspect output passed in as a build arg), you
+will need to remove the ostree-related labels using the `--label KEY-` option:
+
+```Dockerfile
+ARG CHUNKAH_CONFIG_STR
+
+FROM quay.io/fedora/fedora-bootc:latest AS builder
+RUN dnf install -y tmux && dnf clean all
+RUN bootc container lint
+
+FROM quay.io/jlebon/chunkah AS chunkah
+ARG CHUNKAH_CONFIG_STR
+RUN --mount=from=builder,src=/,target=/chunkah,ro \
+    --mount=type=bind,target=/run/src,rw \
+        chunkah build --prune /sysroot/ --max-layers 128 \
+          --label ostree.commit- --label ostree.final-diffid- \
+          > /run/src/out.ociarchive
+
+FROM oci-archive:out.ociarchive
+```
 
 ### Debugging
 
