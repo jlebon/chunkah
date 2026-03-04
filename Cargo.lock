@@ -728,9 +728,9 @@ dependencies = [
 
 [[package]]
 name = "ocidir"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "784ff94e3f5a9b89659b8a4442104df6b5e7974c9b355c4f4ae6e9794af1ad2b"
+checksum = "b2559988a4497b6f6cb02c3066c008515b2d6d98234fb683e284235ef5141295"
 dependencies = [
  "camino",
  "canon-json",
