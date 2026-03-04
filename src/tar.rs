@@ -4,8 +4,8 @@ use std::io::Write;
 use anyhow::{Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std_ext::cap_std::fs::Dir;
+use ocidir::BlobWriter;
 use ocidir::oci_spec::image as oci_image;
-use ocidir::{BlobWriter, WriteComplete};
 
 use crate::components::{FileInfo, FileMap, FileType};
 
@@ -17,29 +17,9 @@ pub enum ArchiveCompression {
     Gzip(flate2::Compression),
 }
 
-/// A passthrough writer that performs no compression.
-// XXX: upstream this to ocidir as e.g. create_uncompressed_layer() ?
-pub(crate) struct NoCompression<'a>(BlobWriter<'a>);
-
-impl std::io::Write for NoCompression<'_> {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.write(buf)
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.0.flush()
-    }
-}
-
-impl<'a> WriteComplete<BlobWriter<'a>> for NoCompression<'a> {
-    fn complete(self) -> std::io::Result<BlobWriter<'a>> {
-        Ok(self.0)
-    }
-}
-
 /// Layer writer that can be either compressed or uncompressed.
 pub enum LayerWriter<'a> {
-    Uncompressed(ocidir::LayerWriter<'a, NoCompression<'a>>),
+    Uncompressed(ocidir::LayerWriter<'a, BlobWriter<'a>>),
     Gzip(ocidir::LayerWriter<'a, flate2::write::GzEncoder<BlobWriter<'a>>>),
 }
 
@@ -77,7 +57,7 @@ pub fn create_layer(
     let layer_writer = match compression {
         crate::ocibuilder::Compression::None => {
             let layer_writer = oci_dir
-                .create_custom_layer(|bw| Ok(NoCompression(bw)), oci_image::MediaType::ImageLayer)
+                .create_uncompressed_layer()
                 .context("creating uncompressed layer writer")?;
             LayerWriter::Uncompressed(layer_writer)
         }
