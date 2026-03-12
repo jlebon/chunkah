@@ -4,6 +4,7 @@
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -17,6 +18,8 @@ def main():
     parser.add_argument("version", help="Version to release (e.g., 0.1.0)")
     parser.add_argument("--no-push", action="store_true",
                         help="Prepare release without pushing to remote")
+    parser.add_argument("--bump", action="store_true",
+                        help="Bump version and open a PR")
     args = parser.parse_args()
 
     tag = f"v{args.version}"
@@ -25,11 +28,37 @@ def main():
     notes_file = Path(f".release-notes-{args.version}.md")
 
     try:
-        if tag_exists(tag):
-            die(f"Tag {tag} already exists")
-
         if is_worktree_dirty():
             die("Worktree is dirty, commit or stash changes first")
+
+        if args.bump:
+            branch = f"release-v{args.version}"
+            step(f"Creating branch {branch}...")
+            run("git", "checkout", "-b", branch)
+
+            bump_version(args.version)
+
+            step("Committing changes...")
+            run("git", "add", "Cargo.toml", "Cargo.lock",
+                "packaging/chunkah.spec", "README.md")
+            run("git", "commit", "-m", f"Cargo.toml: bump version to v{args.version}")
+
+            if args.no_push:
+                print()
+                print(f"Version bumped to {args.version} on branch {branch}.")
+                print("To complete the process, run:")
+                print(f"  git push origin {branch}")
+                print(f"  gh pr create --title 'Cargo.toml: bump version to v{args.version}' --body ''")
+            else:
+                step("Pushing branch...")
+                run("git", "push", "origin", branch)
+                step("Creating pull request...")
+                run("gh", "pr", "create", "--title",
+                    f"Cargo.toml: bump version to v{args.version}", "--body", "")
+            return
+
+        if tag_exists(tag):
+            die(f"Tag {tag} already exists")
 
         # do this first to avoid building implicitly bumping the lockfile
         step("Verifying Cargo.lock and README.md are in sync...")
@@ -123,6 +152,44 @@ def run(*args: str):
 def run_output(*args: str) -> str:
     """Run a command and return its stdout."""
     return subprocess.check_output(args, text=True)
+
+
+def bump_version(version: str):
+    """Bump version in all relevant files."""
+    step(f"Bumping version to {version}...")
+    bump_cargo_toml(version)
+    bump_spec(version)
+    bump_readme(version)
+    bump_cargo_lock()
+
+
+def bump_cargo_toml(version: str):
+    path = Path("Cargo.toml")
+    content = path.read_text()
+    new_content = re.sub(r'^version = "[^"]+"', f'version = "{version}"',
+                         content, count=1, flags=re.MULTILINE)
+    path.write_text(new_content)
+
+
+def bump_spec(version: str):
+    path = Path("packaging/chunkah.spec")
+    content = path.read_text()
+    new_content = re.sub(r'^Version:\s+[^\s]+', f'Version:        {version}',
+                         content, count=1, flags=re.MULTILINE)
+    path.write_text(new_content)
+
+
+def bump_readme(version: str):
+    path = Path("README.md")
+    content = path.read_text()
+    pattern = (r'(https://github\.com/coreos/chunkah/releases/download/v)'
+               r'[0-9]+\.[0-9]+\.[0-9]+(/Containerfile\.splitter)')
+    new_content = re.sub(pattern, rf'\g<1>{version}\g<2>', content)
+    path.write_text(new_content)
+
+
+def bump_cargo_lock():
+    run("cargo", "update", "-p", "chunkah")
 
 
 def verify_version(expected: str):
