@@ -137,19 +137,19 @@ jobs:
             TAG="${GITHUB_REF#refs/tags/}"
             skopeo copy --all --digestfile=/tmp/quay-digest \
               --src-creds=${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} \
-              docker://ghcr.io/${{ github.repository }}:${{ github.sha }} docker://quay.io/coreos/chunkah:${TAG}
+              docker://ghcr.io/${{ github.repository }}:${{ github.sha }} docker://quay.io/jlebon/chunkah:${TAG}
             skopeo copy --all --src-creds=${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} \
-              docker://ghcr.io/${{ github.repository }}:${{ github.sha }} docker://quay.io/coreos/chunkah:latest
+              docker://ghcr.io/${{ github.repository }}:${{ github.sha }} docker://quay.io/jlebon/chunkah:latest
           else
             skopeo copy --all --digestfile=/tmp/quay-digest \
               --src-creds=${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} \
-              docker://ghcr.io/${{ github.repository }}:${{ github.sha }} docker://quay.io/coreos/chunkah:dev
+              docker://ghcr.io/${{ github.repository }}:${{ github.sha }} docker://quay.io/jlebon/chunkah:dev
           fi
           echo "digest=$(cat /tmp/quay-digest)" >> "${GITHUB_OUTPUT}"
       - name: Sign quay.io image
         run: |
           cosign sign --yes --recursive \
-            quay.io/coreos/chunkah@${{ steps.push-quay.outputs.digest }}
+            quay.io/jlebon/chunkah@${{ steps.push-quay.outputs.digest }}
       - name: Cleanup old images
         uses: actions/delete-package-versions@v5
         with:
