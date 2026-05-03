@@ -273,8 +273,8 @@ def format_human_output(images: list[ImageInfo], analyses: list[UpdateAnalysis],
             if show_changed_components and analysis.added_layers:
                 changed = _components_by_size(analysis.added_layers)
                 if changed:
-                    rest = f", ... and {len(changed) - 5} more" if len(changed) > 5 else ""
-                    lines.append(f"      Changed:   {', '.join(changed[:5])}{rest}")
+                    # rest = f", ... and {len(changed) - 5} more" if len(changed) > 5 else ""
+                    lines.append(f"      Changed:   {', '.join(changed)}")
 
             if show_unchanged_components and analysis.shared_layers:
                 unchanged = _components_by_size(analysis.shared_layers)
